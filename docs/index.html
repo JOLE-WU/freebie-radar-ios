@@ -303,9 +303,11 @@
     font-size:9.5px; font-weight:700; letter-spacing:.22em; color: rgba(255,255,255,.72);
   }
   .feature-art .word{
-    position:absolute; left:16px; bottom:10px; z-index:2;
-    font-size:50px; line-height:.94; font-weight:800; letter-spacing:-2.2px; color:#fff;
+    position:absolute; left:16px; bottom:10px; right:16px; z-index:2;
+    font-size:34px; line-height:1.04; font-weight:800; letter-spacing:-1.4px; color:#fff;
     opacity:.96; text-shadow: 0 8px 30px rgba(0,0,0,.35);
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+    word-break:break-word;
   }
   .feature-art .word span{ display:block; font-size:19px; letter-spacing:.04em; font-weight:650; opacity:.6; margin-top:5px; }
   .feature-art .badge-free{
@@ -1354,7 +1356,7 @@ async function bootstrap(){
       const scoreEl = feature.querySelector('.score b');
       if(typeEl) typeEl.textContent = top.src.toUpperCase()+' · 前沿福利';
       if(badgeEl) badgeEl.textContent = top.obtain==='free' ? '0 元免费领' : '有条件领取';
-      if(wordEl) wordEl.innerHTML = escapeHTML(top.t.slice(0,22))+'<span>AI 已验真</span>';
+      if(wordEl) wordEl.innerHTML = escapeHTML(top.t.replace(/^【[^】]*】/,'').slice(0,26));
       if(titleEl) titleEl.textContent = top.t;
       if(metaEl) metaEl.innerHTML = `<span>${top.src}</span><span class="meta-dot"></span><span>${top.cat}</span><span class="meta-dot"></span><span>${top.sources} 个来源同步</span>`;
       if(deadlineEl) deadlineEl.textContent = top.deadline;
