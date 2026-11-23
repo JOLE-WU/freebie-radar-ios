@@ -549,7 +549,58 @@
     display:grid; place-items:center; transition: transform .18s var(--ease), background .18s;
   }
   .btn-ghost:active{ transform:scale(.94); background: var(--card-hi); }
+
   .btn-ghost.saved{ color: var(--accent); background: var(--accent-soft); border-color: rgba(61,224,160,.28); }
+
+  /* ---------- 原文阅读器 ---------- */
+  .reader{
+    position:absolute; inset:0; z-index:110; display:flex; flex-direction:column;
+    background: var(--bg); transform:translateY(102%);
+    transition: transform .46s var(--ease);
+  }
+  .reader.on{ transform:translateY(0); }
+  .rd-top{
+    flex:0 0 auto; display:flex; align-items:center; gap:8px;
+    height: calc(52px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) 12px 0;
+    border-bottom:.5px solid var(--stroke); background: var(--bg-soft);
+  }
+  .rd-icon{
+    width:36px; height:36px; flex:0 0 36px; border:none; cursor:pointer;
+    border-radius:11px; background: var(--card); color: var(--text-2);
+    display:grid; place-items:center; transition: background .18s, transform .18s;
+  }
+  .rd-icon:active{ transform:scale(.92); background: var(--card-hi); }
+  .rd-title{ flex:1; min-width:0; font-size:13px; font-weight:650; }
+  .rd-title span{ display:block; font-size:10px; font-weight:500; color:var(--text-3); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rd-title b{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rd-seg{ display:flex; background: var(--card); border-radius:9px; padding:3px; flex:0 0 auto; }
+  .rd-seg button{
+    border:none; cursor:pointer; background:transparent; color:var(--text-3);
+    font-size:11px; font-weight:650; padding:6px 10px; border-radius:7px;
+    transition: background .18s, color .18s;
+  }
+  .rd-seg button.on{ background: var(--card-solid); color: var(--text); box-shadow:0 2px 8px rgba(0,0,0,.16); }
+  .rd-stage{ flex:1 1 auto; min-height:0; position:relative; }
+  .rd-view{ position:absolute; inset:0; display:none; }
+  .rd-view.on{ display:block; }
+  .rd-frame{ width:100%; height:100%; border:0; background:var(--bg); }
+  .rd-loading{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:12px; color:var(--text-3); font-size:12px; background:var(--bg); z-index:2;
+    transition: opacity .3s;
+  }
+  .rd-loading.hide{ opacity:0; pointer-events:none; }
+  .rd-spin{ width:26px; height:26px; border:2px solid var(--stroke-hi); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .rd-article{ height:100%; overflow-y:auto; padding:22px 20px calc(40px + env(safe-area-inset-bottom,0px)); scrollbar-width:none; }
+  .rd-article::-webkit-scrollbar{ display:none; }
+  .rd-article h2{ font-size:21px; line-height:1.4; font-weight:740; letter-spacing:-.4px; }
+  .rd-article .rd-meta{ font-size:11px; color:var(--text-3); margin-top:8px; }
+  .rd-article .rd-bodytxt{ margin-top:18px; font-size:14px; line-height:1.9; color:var(--text-2); white-space:pre-wrap; word-break:break-word; }
+  .rd-article .rd-tip{ margin-top:22px; padding:12px 14px; border-radius:13px; background:var(--card); border:.5px solid var(--stroke); font-size:11px; line-height:1.6; color:var(--text-3); }
+  .rd-article .rd-tip b{ color:var(--text-2); }
+  .rd-open{ margin-top:14px; width:100%; height:44px; border-radius:13px; border:none; cursor:pointer; background:var(--accent); color:var(--accent-ink); font-size:13px; font-weight:700; }
 
   /* ---------- 搜索面板 ---------- */
   .searchpanel{
@@ -902,6 +953,32 @@
         </div>
 
       </div>
+
+        <!-- 原文阅读器（App 内直接看，不跳转） -->
+        <div class="reader" id="reader" role="dialog" aria-modal="true">
+          <div class="rd-top">
+            <button class="rd-icon" id="rdBack" aria-label="返回">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <div class="rd-title"><b id="rdTitle">原文</b><span id="rdSrc"></span></div>
+            <div class="rd-seg">
+              <button data-rdtab="web" class="on">网页</button>
+              <button data-rdtab="text">正文</button>
+            </div>
+            <button class="rd-icon" id="rdReload" aria-label="刷新">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 10-2.3 5.7M20 5v6h-6"/></svg>
+            </button>
+          </div>
+          <div class="rd-stage">
+            <div class="rd-view on" data-rdview="web">
+              <div class="rd-loading" id="rdLoading"><div class="rd-spin"></div><span>正在加载原文…</span></div>
+              <iframe class="rd-frame" id="rdFrame" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
+            </div>
+            <div class="rd-view" data-rdview="text">
+              <div class="rd-article" id="rdArticle"></div>
+            </div>
+          </div>
+        </div>
     </div>
     <div class="home-indicator"></div>
   </div>
@@ -1182,9 +1259,9 @@ function openItem(id){
     ${it.code ? `<div class="codebox"><div class="c">${it.code}</div><button class="copy" data-copy="${it.code}">复制</button></div>` : ''}
     <p style="margin-top:14px; font-size:12px; line-height:1.7; color:var(--text-2)">${it.desc}</p>
     <div class="actions">
-      <button class="btn-primary" data-openoriginal="${it.url}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M14 4h6v6M20 4l-8.5 8.5"/><path d="M19 14v4.5A1.5 1.5 0 0117.5 20h-11A1.5 1.5 0 015 18.5v-11A1.5 1.5 0 016.5 6H11"/></svg>
-        打开原文
+      <button class="btn-primary" data-readoriginal="${it.id}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg>
+        App 内阅读原文
       </button>
       <button class="btn-ghost" id="saveBtn" aria-label="收藏">
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6.5 4h11a1 1 0 011 1v15l-6.5-4-6.5 4V5a1 1 0 011-1z"/></svg>
@@ -1194,6 +1271,58 @@ function openItem(id){
   body.scrollTop = 0;
 }
 function closeSheet(){ dim.classList.remove('on'); sheet.classList.remove('on'); }
+
+/* ---------- 原文阅读器 ---------- */
+const reader = $('#reader'), rdFrame = $('#rdFrame'), rdLoading = $('#rdLoading');
+let rdLoadTimer = null;
+function openReader(id){
+  const it = ITEMS.find(x=>x.id===id); if(!it) return;
+  $('#rdTitle').textContent = it.t;
+  $('#rdSrc').textContent = it.src + ' · ' + it.ago;
+  const art = (it.article || '').trim();
+  const txt = art || it.desc || '该条目暂无正文快照。';
+  $('#rdArticle').innerHTML = `
+    <h2>${it.t}</h2>
+    <div class="rd-meta">${it.src} · ${it.cat} · ${it.ago}${it.deadline ? ' · '+it.deadline : ''}</div>
+    <div class="rd-bodytxt">${txt}</div>
+    <div class="rd-tip">${art ? '以上是抓取的<b>原文正文快照</b>，可离线阅读。' : '原文站点未开放正文抓取，此处显示<b>摘要</b>。'}<br>点「网页」标签可尝试直接加载原站点。</div>
+    ${it.url && /^https?:\/\//.test(it.url) ? `<button class="rd-open" id="rdOpenExternal" data-url="${it.url}">在浏览器打开完整原文</button>` : ''}`;
+  switchRdTab('web');
+  rdLoading.classList.remove('hide');
+  rdFrame.onload = ()=>{
+    rdLoading.classList.add('hide'); $('#app').scrollTop=0;
+    // 若目标站点拒绝内嵌 / 加载失败，自动切到正文，避免空白
+    let blank = false;
+    try{ const d = rdFrame.contentDocument; blank = !d || d.URL === 'about:blank' || !d.body || d.body.innerText.trim().length === 0; }
+    catch(e){ blank = false; } // 跨域 SecurityError = 真实加载了外部站点
+    if(blank && $('[data-rdtab="web"]').classList.contains('on')) switchRdTab('text');
+  };
+  if(it.url && /^https?:\/\//.test(it.url)){
+    rdFrame.src = it.url;
+  } else { rdFrame.src = 'about:blank'; rdLoading.classList.add('hide'); }
+  clearTimeout(rdLoadTimer);
+  rdLoadTimer = setTimeout(()=> rdLoading.classList.add('hide'), 8000);
+  closeSheet();
+  reader.classList.add('on');
+  requestAnimationFrame(()=>{ $('#app').scrollTop = 0; });
+  setTimeout(()=>{ $('#app').scrollTop = 0; }, 300);
+}
+function closeReader(){
+  reader.classList.remove('on'); clearTimeout(rdLoadTimer);
+  setTimeout(()=>{ rdFrame.src = 'about:blank'; }, 400);
+}
+function switchRdTab(which){
+  $$('[data-rdtab]').forEach(b=>b.classList.toggle('on', b.dataset.rdtab===which));
+  $$('[data-rdview]').forEach(v=>v.classList.toggle('on', v.dataset.rdview===which));
+}
+$('#rdBack').addEventListener('click', closeReader);
+$('#rdReload').addEventListener('click', ()=>{
+  rdLoading.classList.remove('hide');
+  rdFrame.src = rdFrame.src;
+  clearTimeout(rdLoadTimer);
+  rdLoadTimer = setTimeout(()=>rdLoading.classList.add('hide'), 8000);
+});
+
 document.addEventListener('click', e=>{
   const o = e.target.closest('[data-open]'); if(o){ openItem(o.dataset.open); }
   const chan = e.target.closest('[data-chan]');
@@ -1215,15 +1344,12 @@ document.addEventListener('click', e=>{
   }
   const c = e.target.closest('[data-copy]');
   if(c){ copyText(c.dataset.copy); }
-  const ol = e.target.closest('[data-openoriginal]');
-  if(ol){
-    const u = ol.dataset.openoriginal;
-    if(u && /^https?:\/\//.test(u)){
-      const a = document.createElement('a');
-      a.href = u; a.target = '_blank'; a.rel = 'noopener noreferrer';
-      document.body.appendChild(a); a.click(); a.remove();
-    } else { toast('该条目暂无原文链接'); }
-  }
+  const rd = e.target.closest('[data-readoriginal]');
+  if(rd){ openReader(rd.dataset.readoriginal); }
+  const rdt = e.target.closest('[data-rdtab]');
+  if(rdt){ switchRdTab(rdt.dataset.rdtab); }
+  const rdOpen = e.target.closest('#rdOpenExternal');
+  if(rdOpen && rdOpen.dataset.url) window.open(rdOpen.dataset.url, '_blank', 'noopener,noreferrer');
   if(e.target.closest('#subBtn')){ toast('已开启每日 08:30 推送（演示）'); }
   if(e.target.closest('#allPicks')){ toast('演示环境：完整 12 条精选'); }
   if(e.target.closest('#appearanceRow')){ toggleTheme(); }
