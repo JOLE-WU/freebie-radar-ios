@@ -2,7 +2,7 @@
  * 抓取 freebie-radar 演示站的公开真实数据，生成 docs/data.json
  * 由 GitHub Actions 每小时定时运行。数据源：radar.zichuanlan.top 公开只读 API。
  */
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 
 const BASE = 'https://radar.zichuanlan.top';
 // 演示站官方「已验证真福利」预设：AI 验真 + 未过期 + 7天内 + 免费/有条件
@@ -73,6 +73,56 @@ async function getJSON(url){
   return r.json();
 }
 
+/* ---------- 正文抓取：为 App 内阅读器提供原文快照 ---------- */
+function stripTags(html){
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi,' ')
+    .replace(/<style[\s\S]*?<\/style>/gi,' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi,' ')
+    .replace(/<[^>]+>/g,' ')
+    .replace(/&nbsp;|&#160;/g,' ').replace(/&amp;/g,'&')
+    .replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'")
+    .replace(/\s+/g,' ').trim();
+}
+function extractArticle(html){
+  // 优先取 article / main 等正文容器
+  const blocks = [
+    /<article\b[^>]*>([\s\S]*?)<\/article>/i,
+    /<main\b[^>]*>([\s\S]*?)<\/main>/i,
+    /<div[^>]*class=["'][^"']*(?:content|post|article|entry|detail)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i
+  ];
+  for(const re of blocks){
+    const m = html.match(re);
+    if(m){ const t = stripTags(m[1]); if(t.length>120) return t; }
+  }
+  // 退而求其次：og:description / description
+  const meta = html.match(/<meta[^>]+(?:property=["']og:description["']|name=["']description["'])[^>]*content=["']([^"']{20,})["']/i)
+            || html.match(/<meta[^>]+content=["']([^"']{20,})["'][^>]*(?:property=["']og:description["']|name=["']description["'])/i);
+  if(meta) return stripTags(meta[1]);
+  return '';
+}
+async function fetchArticle(url, timeout=9000){
+  if(!/^https?:\/\//.test(url)) return '';
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), timeout);
+  try{
+    const r = await fetch(url, {
+      signal: ctrl.signal, redirect:'follow',
+      headers:{
+        'User-Agent':'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        'Accept-Language':'zh-CN,zh;q=0.9'
+      }
+    });
+    if(!r.ok) return '';
+    const ct = r.headers.get('content-type') || '';
+    if(!/text\/html/i.test(ct)) return '';
+    const html = (await r.text()).slice(0,900000);
+    return extractArticle(html).slice(0,6000);
+  }catch(e){ return ''; }
+  finally{ clearTimeout(timer); }
+}
+
 async function main(){
   console.log('抓取真实数据…');
   const [feed, stats] = await Promise.all([
@@ -85,6 +135,14 @@ async function main(){
   // 过滤明显失效的条目（标题含「已无」「已失效」「已结束」）
   const valid = raw.filter(it => !/已无|已失效|已结束|已过期/.test(it.title || ''));
   console.log(`过滤失效条目后剩 ${valid.length} 条`);
+
+  // 复用上一版已抓取的正文，避免每小时全部重抓
+  let articleCache = {};
+  try{
+    const prev = JSON.parse(readFileSync(new URL('../docs/data.json', import.meta.url), 'utf8'));
+    for(const x of (prev.items||[])) if(x.article) articleCache[x.id] = x.article;
+  }catch(e){ console.log('暂无历史正文缓存，将首次抓取'); }
+  console.log(`历史正文缓存 ${Object.keys(articleCache).length} 条`);
 
   const items = valid.map((it, idx)=>{
     const ai = it.ai || {};
@@ -103,6 +161,7 @@ async function main(){
       image: it.image_url || '',
       code: codes.length ? (typeof codes[0]==='string' ? codes[0] : (codes[0].code||'')) : '',
       url: it.url || '',
+      article: articleCache[String(it.id)] || '',
       desc: (it.summary || '').slice(0,160) || (ai.reason || '来自公开信息源，AI 已验证真实性。'),
       verdict: ai.reason ? `AI 已验真：${ai.reason}。评分 ${it.score||'—'}，来源 ${it.dupCount||1} 处同步。` : 'AI 已验真：来自公开信息源，多重来源确认。'
     };
@@ -125,6 +184,22 @@ async function main(){
       x.t, x.verdict, x.logo||x.id, x.id
     ])
   };
+
+  // 补抓缺失正文（最多 30 条，5 并发，避免拖慢每小时任务 / 触发反爬）
+  const missing = items.filter(x=>!x.article && /^https?:\/\//.test(x.url)).slice(0,30);
+  if(missing.length){
+    console.log(`补抓 ${missing.length} 条原文正文…`);
+    let cursor = 0, ok = 0;
+    async function worker(){
+      while(cursor < missing.length){
+        const item = missing[cursor++];
+        const art = await fetchArticle(item.url);
+        if(art){ item.article = art; ok++; }
+      }
+    }
+    await Promise.all(Array.from({length:5}, worker));
+    console.log(`正文抓取成功 ${ok}/${missing.length} 条`);
+  }
 
   writeFileSync(new URL('../docs/data.json', import.meta.url), JSON.stringify(data, null, 2));
   console.log(`已生成 docs/data.json：${items.length} 条真福利，更新时间 ${data.updated}`);
