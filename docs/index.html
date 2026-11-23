@@ -1316,7 +1316,7 @@ function toggleTheme(){
 /* ---------- 真实数据加载 ---------- */
 async function bootstrap(){
   try{
-    const res = await fetch('./data.json' + (location.protocol==='file:' ? '' : '?t='+Date.now()), { cache:'no-store' });
+    const res = await fetch('./data.json', { cache:'no-store' });
     if(!res.ok) throw new Error('data.json '+res.status);
     const data = await res.json();
     if(!data.items || !data.items.length) throw new Error('数据为空');
