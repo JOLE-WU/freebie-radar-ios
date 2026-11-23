@@ -1,4 +1,4 @@
-# 资源雷达 · iOS 套壳客户端
+# Fresource · iOS 套壳客户端
 
 一个「原生壳 + 远端网页」的 iOS 方案：原生部分只是固定的 WebView 外壳，所有界面与数据都来自 `docs/` 里的 PWA。因此后续改 UI、改数据、改交互，**只需要更新 `docs/` 并推送**，不需要重新打包 IPA，也不消耗 GitHub Actions 额度。
 
@@ -24,7 +24,7 @@ iPhone Safari 打开 → 分享 → **添加到主屏幕**，即可全屏运行�
 
 ## 出 IPA（GitHub Actions 云端编译，无需 Mac）
 
-推送后到 Actions → "Build 资源雷达 IPA" → Run workflow，macOS runner 会自动编译并产出 \`Radar-v*-unsigned.ipa\` 作为 artifact 下载，可直接用 AltStore / Sideloadly / 巨魔 等侧载。
+推送后到 Actions → "Build Fresource IPA" → Run workflow，macOS runner 会自动编译并产出 \`Radar-v*-unsigned.ipa\` 作为 artifact 下载，可直接用 AltStore / Sideloadly / 巨魔 等侧载。
 
 如需签名版，在仓库 Settings → Secrets 配置 \`APPLE_TEAM_ID\` / \`APPLE_CERTIFICATE_P12\` / \`APPLE_CERTIFICATE_PASSWORD\` / \`APPLE_PROVISIONING_PROFILE\`。
 
