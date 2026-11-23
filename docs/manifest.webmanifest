@@ -1,6 +1,6 @@
 {
-  "name": "资源雷达 · Resource Radar",
-  "short_name": "资源雷达",
+  "name": "Fresource",
+  "short_name": "Fresource",
   "description": "聚合全网福利、好价、开源项目与资讯，AI 过滤假福利的 iOS 风格客户端",
   "id": "./",
   "start_url": "./index.html",
@@ -11,7 +11,11 @@
   "theme_color": "#080B0F",
   "lang": "zh-CN",
   "dir": "ltr",
-  "categories": ["news", "utilities", "shopping"],
+  "categories": [
+    "news",
+    "utilities",
+    "shopping"
+  ],
   "icons": [
     {
       "src": "./icons/icon-192.png",
