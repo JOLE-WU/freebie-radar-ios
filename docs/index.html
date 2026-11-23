@@ -356,6 +356,12 @@
   .thumb.t4{ background: linear-gradient(150deg,#4B2B63,#1C1026); }
   .thumb.t5{ background: linear-gradient(150deg,#24506B,#0D1D27); }
   .thumb .glow{ position:absolute; inset:auto -30% -60% -30%; height:70%; background:rgba(255,255,255,.16); filter:blur(12px); }
+  .thumb img{ width:100%; height:100%; border-radius:13px; display:block; object-fit:cover; }
+  .sheet-brand{ display:flex; align-items:center; gap:11px; padding:2px 0 14px; margin-bottom:4px; border-bottom:.5px solid var(--stroke); }
+  .sheet-brand img{ width:46px; height:46px; border-radius:13px; flex:0 0 46px; }
+  .sheet-brand b{ display:block; font-size:14px; font-weight:700; letter-spacing:-.2px; }
+  .sheet-brand span{ display:block; font-size:11px; color:var(--text-3); margin-top:3px; }
+  .tl-logo{ width:22px; height:22px; border-radius:7px; flex:0 0 22px; }
   .row .body{ flex:1 1 auto; min-width:0; }
   .row .t{
     font-size:13.5px; font-weight:600; line-height:1.4; letter-spacing:-.1px;
@@ -918,6 +924,28 @@
 </div>
 
 <script>
+/* ---------- 品牌 Logo（内嵌 SVG，离线可用） ---------- */
+const BRAND = {
+  epic:     {a:'#262626',b:'#000000',ico:'<path d="M32 11 L51 21.5 V42.5 L32 53 L13 42.5 V21.5 Z" fill="none" stroke="#fff" stroke-width="3.2" stroke-linejoin="round"/><path d="M13 21.5 L32 32 L51 21.5 M32 32 V53" stroke="#fff" stroke-width="3.2" fill="none" stroke-linejoin="round"/>'},
+  esim:     {a:'#3b7cff',b:'#0f3a99',ico:'<rect x="18" y="13" width="28" height="38" rx="5" fill="#fff"/><path d="M46 13 v9 h-9 v-9" fill="{BG}"/><rect x="24" y="27" width="12" height="10" rx="2" fill="{BG}" opacity=".85"/><path d="M24 43h13M24 47h9" stroke="{BG}" stroke-width="2.2" stroke-linecap="round"/>'},
+  llm:      {a:'#ff8a1f',b:'#e04200',ico:'<path d="M21 44 a10 10 0 0 1 1 -20 a14 14 0 0 1 26 3 a9.5 9.5 0 0 1 -2 17 z" fill="#fff"/><circle cx="27" cy="35" r="2" fill="{BG}"/><circle cx="37" cy="35" r="2" fill="{BG}"/>'},
+  racknerd: {a:'#2f6bff',b:'#0a2a78',ico:'<rect x="15" y="15" width="34" height="10" rx="2.5" fill="#fff"/><rect x="15" y="27" width="34" height="10" rx="2.5" fill="#fff"/><rect x="15" y="39" width="34" height="10" rx="2.5" fill="#fff"/><circle cx="21" cy="20" r="1.7" fill="{BG}"/><circle cx="21" cy="32" r="1.7" fill="#37d67a"/><circle cx="21" cy="44" r="1.7" fill="#ffb020"/><path d="M28 20h15M28 32h15M28 44h15" stroke="{BG}" stroke-width="1.6" opacity=".5"/>'},
+  adguard:  {a:'#ff4136',b:'#a80f08',ico:'<path d="M32 11 L51 18 V32 C51 43 43 50 32 54 C21 50 13 43 13 32 V18 Z" fill="#fff"/><path d="M23 32 l6 6 13 -14" stroke="{BG}" stroke-width="4.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'},
+  bili:     {a:'#fb7299',b:'#cf4a76',ico:'<path d="M23 14 L31 22 M41 14 L33 22" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/><rect x="14" y="23" width="36" height="26" rx="7" fill="#fff"/><circle cx="25" cy="36" r="2.8" fill="{BG}"/><circle cx="39" cy="36" r="2.8" fill="{BG}"/>'},
+  kuma:     {a:'#4aa96c',b:'#15663a',ico:'<path d="M25 23 L14 32 L25 41 M39 23 L50 32 L39 41 M35 19 L29 45" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'},
+  netease:  {a:'#f0453a',b:'#a81018',ico:'<path d="M29 40 V19 L47 15 V36" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="41" r="5.5" fill="#fff"/><circle cx="42" cy="37" r="5.5" fill="#fff"/>'},
+  cloudpc:  {a:'#1e86ff',b:'#0744a8',ico:'<rect x="12" y="17" width="40" height="27" rx="4" fill="#fff"/><rect x="16" y="21" width="32" height="19" rx="2" fill="{BG}"/><path d="M27 51h10M32 44v7" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>'},
+  kb:       {a:'#ff9a2e',b:'#c25600',ico:'<rect x="11" y="22" width="42" height="22" rx="4" fill="#fff"/><g fill="{BG}"><rect x="16" y="27" width="5" height="4" rx="1"/><rect x="24" y="27" width="5" height="4" rx="1"/><rect x="32" y="27" width="5" height="4" rx="1"/><rect x="40" y="27" width="5" height="4" rx="1"/><rect x="16" y="35" width="9" height="4" rx="1"/><rect x="28" y="35" width="12" height="4" rx="1"/><rect x="43" y="35" width="5" height="4" rx="1"/></g>'}
+};
+function brandSVG(id){
+  const k = BRAND[id] || BRAND.epic;
+  const ico = k.ico.replace(/\{BG\}/g, k.b);
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+    + '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="'+k.a+'"/><stop offset="1" stop-color="'+k.b+'"/></linearGradient></defs>'
+    + '<rect width="64" height="64" rx="14" fill="url(#g)"/>'+ico+'</svg>';
+  return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+}
+
 const ITEMS = [
   {
     id:'epic', t:'Epic《Bread and Fred》双人合作解谜，限时 0 元永久入库', src:'Epic Games',
@@ -992,14 +1020,14 @@ const ITEMS = [
 ];
 
 const CHANNELS = [
-  { n:'真福利精选', c:'2,318', i:'spark' },
-  { n:'全部白嫖', c:'5,902', i:'free' },
-  { n:'实物福利', c:'486', i:'box' },
-  { n:'网盘 / 网课', c:'1,204', i:'cloud' },
-  { n:'黑五 / 好价', c:'3,771', i:'tag' },
-  { n:'开源项目', c:'640', i:'code' },
-  { n:'重要新闻', c:'1,860', i:'news' },
-  { n:'行业资讯', c:'3,320', i:'chart' }
+  { n:'真福利精选', c:'2,318', i:'spark', f:'free' },
+  { n:'全部白嫖', c:'5,902', i:'free', f:'all' },
+  { n:'实物福利', c:'486', i:'box', f:'all' },
+  { n:'网盘 / 网课', c:'1,204', i:'cloud', f:'all' },
+  { n:'黑五 / 好价', c:'3,771', i:'tag', f:'paid' },
+  { n:'开源项目', c:'640', i:'code', f:'all' },
+  { n:'重要新闻', c:'1,860', i:'news', f:'all' },
+  { n:'行业资讯', c:'3,320', i:'chart', f:'all' }
 ];
 
 const ICONS = {
@@ -1026,7 +1054,7 @@ function tagsOf(it){
 function rowHTML(it, i=0, delay=0){
   return `
     <div class="row" data-open="${it.id}" style="opacity:0; transform:translateY(8px); animation:rise .5s var(--ease) ${0.03*i+delay}s forwards">
-      <div class="thumb ${it.thumb}"><span class="glow"></span><span style="position:relative">${it.mark}</span></div>
+      <div class="thumb"><img src="${brandSVG(it.id)}" alt="${it.src}"></div>
       <div class="body">
         <div class="t">${it.t}</div>
         <div class="m">
@@ -1108,7 +1136,7 @@ $('#catChips').addEventListener('click', e=>{
 
 /* ---------- 频道 ---------- */
 $('#chanGrid').innerHTML = CHANNELS.map((c,i)=>`
-  <div class="chan" style="opacity:0; transform:translateY(10px); animation:rise .5s var(--ease) ${0.04*i}s forwards">
+  <div class="chan" data-chan="${c.n}" data-filter="${c.f||'all'}" style="opacity:0; transform:translateY(10px); animation:rise .5s var(--ease) ${0.04*i}s forwards">
     <div class="deco"></div>
     <div class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">${ICONS[c.i]}</svg></div>
     <div>
@@ -1132,7 +1160,7 @@ $('#timeline').innerHTML = PICKS.map((p,i)=>`
   <div class="tl-item" data-open="${p[2]}" style="opacity:0; animation:rise .5s var(--ease) ${0.05*i}s forwards">
     <div class="tl-num">${String(i+1).padStart(2,'0')}</div>
     <div class="tl-body">
-      <div class="t">${p[0]}</div>
+      <div class="t" style="display:flex;align-items:center;gap:8px"><img class="tl-logo" src="${brandSVG(p[2])}" alt="">${p[0]}</div>
       <div class="why"><em>AI 理由：</em>${p[1]}</div>
     </div>
   </div>`).join('');
@@ -1142,6 +1170,7 @@ const sheet = $('#sheet'), dim = $('#dim'), body = $('#sheetBody');
 function openItem(id){
   const it = ITEMS.find(x=>x.id===id); if(!it) return;
   body.innerHTML = `
+    <div class="sheet-brand"><img src="${brandSVG(it.id)}" alt=""><div><b>${it.src}</b><span>${it.cat} · ${it.sources} 个来源确认</span></div></div>
     <div class="kick">${it.src} · ${it.cat}</div>
     <h3>${it.t}</h3>
     <div class="meta">
@@ -1178,6 +1207,23 @@ function openItem(id){
 function closeSheet(){ dim.classList.remove('on'); sheet.classList.remove('on'); }
 document.addEventListener('click', e=>{
   const o = e.target.closest('[data-open]'); if(o){ openItem(o.dataset.open); }
+  const chan = e.target.closest('[data-chan]');
+  if(chan){
+    const name = chan.dataset.chan, f = chan.dataset.filter || 'all';
+    $$('.tab').forEach(t=>t.classList.toggle('on', t.dataset.tab==='page-radar'));
+    $$('.page').forEach(pg=>pg.classList.toggle('active', pg.id==='page-radar'));
+    $$('#catChips .chip').forEach(c=>c.classList.toggle('on', c.dataset.cat===f));
+    renderFeed(f);
+    toast('已进入「'+name+'」频道');
+  }
+  const catEl = e.target.closest('.cats .cat');
+  if(catEl){
+    const kw = (catEl.firstChild ? catEl.firstChild.textContent : '').trim();
+    $$('.tab').forEach(t=>t.classList.toggle('on', t.dataset.tab==='page-radar'));
+    $$('.page').forEach(pg=>pg.classList.toggle('active', pg.id==='page-radar'));
+    renderFeed('all', kw);
+    toast('已按「'+kw+'」筛选');
+  }
   const c = e.target.closest('[data-copy]');
   if(c){ copyText(c.dataset.copy); }
   if(e.target.closest('[data-copy-link]')){ toast('演示环境：将跳转原文'); }
