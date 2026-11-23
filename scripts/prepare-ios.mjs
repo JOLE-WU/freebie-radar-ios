@@ -55,4 +55,4 @@ const exportOptions = `<?xml version="1.0" encoding="UTF-8"?>
 mkdirSync(join(ROOT, "build"), { recursive: true });
 writeFileSync(join(ROOT, "build", "ExportOptions.plist"), exportOptions);
 
-console.log(`\n资源雷达 v${MARKETING} (build ${BUILD}) — Xcode 工程就绪。`);
+console.log(`\nFresource v${MARKETING} (build ${BUILD}) — Xcode 工程就绪。`);
