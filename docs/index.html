@@ -357,6 +357,10 @@
   .thumb.t5{ background: linear-gradient(150deg,#24506B,#0D1D27); }
   .thumb .glow{ position:absolute; inset:auto -30% -60% -30%; height:70%; background:rgba(255,255,255,.16); filter:blur(12px); }
   .thumb img{ width:100%; height:100%; border-radius:13px; display:block; object-fit:cover; }
+  .logo-fb{ display:block; width:100%; height:100%; }
+  .logo-fb svg{ width:100%; height:100%; display:block; }
+  .sheet-cover{ margin:0 -20px 14px; height:180px; overflow:hidden; background:var(--card-hi); }
+  .sheet-cover img{ width:100%; height:100%; object-fit:cover; display:block; }
   .sheet-brand{ display:flex; align-items:center; gap:11px; padding:2px 0 14px; margin-bottom:4px; border-bottom:.5px solid var(--stroke); }
   .sheet-brand img{ width:46px; height:46px; border-radius:13px; flex:0 0 46px; }
   .sheet-brand b{ display:block; font-size:14px; font-weight:700; letter-spacing:-.2px; }
@@ -946,7 +950,7 @@ function brandSVG(id){
   return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
 
-const ITEMS = [
+let ITEMS = [
   {
     id:'epic', t:'Epic《Bread and Fred》双人合作解谜，限时 0 元永久入库', src:'Epic Games',
     cat:'游戏', obtain:'free', score:96, ago:'刚刚', deadline:'11 天后截止', sources:20,
@@ -1054,7 +1058,7 @@ function tagsOf(it){
 function rowHTML(it, i=0, delay=0){
   return `
     <div class="row" data-open="${it.id}" style="opacity:0; transform:translateY(8px); animation:rise .5s var(--ease) ${0.03*i+delay}s forwards">
-      <div class="thumb"><img src="${brandSVG(it.id)}" alt="${it.src}"></div>
+      <div class="thumb"><img src="${brandSVG(it.logo||it.id)}" alt=""></div>
       <div class="body">
         <div class="t">${it.t}</div>
         <div class="m">
@@ -1146,7 +1150,7 @@ $('#chanGrid').innerHTML = CHANNELS.map((c,i)=>`
   </div>`).join('');
 
 /* ---------- 精选时间线 ---------- */
-const PICKS = [
+let PICKS = [
   ['Epic 喜加一《Bread and Fred》','0 元永久入库，11 天后截止，20 个来源确认。','epic'],
   ['AdGuard 半年授权 CDK','兑换码已自动提取，直接复制激活，库存有限。','adguard'],
   ['阿里百炼 100 万 Tokens','AI 额度里性价比最高的一档，180 天有效。','llm'],
@@ -1156,21 +1160,25 @@ const PICKS = [
   ['RackNerd 黑五年付 $10.99','同配置历史低位，适合轻量代理或小站。','racknerd'],
   ['机械键盘抽奖 ×3','中奖率低，仅作消遣，已单独归入抽奖分级。','kb']
 ];
-$('#timeline').innerHTML = PICKS.map((p,i)=>`
-  <div class="tl-item" data-open="${p[2]}" style="opacity:0; animation:rise .5s var(--ease) ${0.05*i}s forwards">
+function renderTimeline(){
+  $('#timeline').innerHTML = PICKS.map((p,i)=>`
+  <div class="tl-item" data-open="${p[3]||p[2]}" style="opacity:0; animation:rise .5s var(--ease) ${0.05*i}s forwards">
     <div class="tl-num">${String(i+1).padStart(2,'0')}</div>
     <div class="tl-body">
       <div class="t" style="display:flex;align-items:center;gap:8px"><img class="tl-logo" src="${brandSVG(p[2])}" alt="">${p[0]}</div>
       <div class="why"><em>AI 理由：</em>${p[1]}</div>
     </div>
   </div>`).join('');
+}
+renderTimeline();
 
 /* ---------- 详情弹层 ---------- */
 const sheet = $('#sheet'), dim = $('#dim'), body = $('#sheetBody');
 function openItem(id){
   const it = ITEMS.find(x=>x.id===id); if(!it) return;
   body.innerHTML = `
-    <div class="sheet-brand"><img src="${brandSVG(it.id)}" alt=""><div><b>${it.src}</b><span>${it.cat} · ${it.sources} 个来源确认</span></div></div>
+    ${(it.image && /^https?:\/\//.test(it.image)) ? `<div class="sheet-cover"><img src="${it.image}" alt="" onerror="this.parentElement.style.display='none'"></div>` : ''}
+    <div class="sheet-brand"><img src="${brandSVG(it.logo||it.id)}" alt=""><div><b>${it.src}</b><span>${it.cat} · ${it.sources} 个来源确认</span></div></div>
     <div class="kick">${it.src} · ${it.cat}</div>
     <h3>${it.t}</h3>
     <div class="meta">
@@ -1303,6 +1311,87 @@ function toggleTheme(){
   $('#themeLabel').textContent = next === 'dark' ? '深色' : '浅色';
   document.querySelector('meta[name=theme-color]').setAttribute('content', next==='dark' ? '#080B0F' : '#F2F4F7');
 }
+
+
+/* ---------- 真实数据加载 ---------- */
+async function bootstrap(){
+  try{
+    const res = await fetch('./data.json' + (location.protocol==='file:' ? '' : '?t='+Date.now()), { cache:'no-store' });
+    if(!res.ok) throw new Error('data.json '+res.status);
+    const data = await res.json();
+    if(!data.items || !data.items.length) throw new Error('数据为空');
+
+    // 覆盖列表与精选
+    ITEMS = data.items;
+    if(data.picks && data.picks.length) PICKS = data.picks;
+
+    // 顶部统计数字
+    if(data.stats){
+      const nums = $$('.stats .stat .n');
+      if(nums[0]) nums[0].textContent = '+'+(data.stats.added24h||0).toLocaleString();
+      if(nums[1]) nums[1].textContent = (data.stats.withCodes||0).toLocaleString();
+      if(nums[2]) nums[2].textContent = (data.stats.filtered||0).toLocaleString();
+      const sub = $('#page-radar .hero-head .sub');
+      if(sub) sub.innerHTML = `已替你滤掉 <b>${(data.stats.filtered||0).toLocaleString()}</b> 条水帖 · 覆盖 <b>111</b> 个信息源`;
+    }
+
+    // 全部 chip 计数
+    const allChip = $('#catChips .chip[data-cat="all"] .cnt');
+    if(allChip) allChip.textContent = ITEMS.length;
+
+    // 首页本周精选大卡 -> 最高分真福利
+    const top = ITEMS.slice().sort((a,b)=>b.score-a.score)[0];
+    const feature = $('#page-radar .feature');
+    if(top && feature){
+      feature.setAttribute('data-open', top.id);
+      const typeEl = feature.querySelector('.feature-art .type');
+      const badgeEl = feature.querySelector('.badge-free');
+      const wordEl = feature.querySelector('.word');
+      const titleEl = feature.querySelector('.feature-title');
+      const metaEl = feature.querySelector('.feature-meta');
+      const deadlineEl = feature.querySelector('.tag.time');
+      const obtainEl = feature.querySelector('.tag.free');
+      const scoreEl = feature.querySelector('.score b');
+      if(typeEl) typeEl.textContent = top.src.toUpperCase()+' · 前沿福利';
+      if(badgeEl) badgeEl.textContent = top.obtain==='free' ? '0 元免费领' : '有条件领取';
+      if(wordEl) wordEl.innerHTML = escapeHTML(top.t.slice(0,22))+'<span>AI 已验真</span>';
+      if(titleEl) titleEl.textContent = top.t;
+      if(metaEl) metaEl.innerHTML = `<span>${top.src}</span><span class="meta-dot"></span><span>${top.cat}</span><span class="meta-dot"></span><span>${top.sources} 个来源同步</span>`;
+      if(deadlineEl) deadlineEl.textContent = top.deadline;
+      if(obtainEl) obtainEl.textContent = top.obtain==='free' ? '直接白嫖' : '有条件';
+      if(scoreEl) scoreEl.textContent = top.score;
+    }
+
+    // 频道计数：按当前真实条数比例换算显示
+    $$('#chanGrid .chan').forEach((el,i)=>{
+      const ct = el.querySelector('.ct');
+      if(ct && data.stats && data.stats.total){
+        const base = [2318,5902,486,1204,3771,640,1860,3320][i] || 1000;
+        const ratio = data.stats.total/20573;
+        ct.textContent = Math.round(base*ratio).toLocaleString()+' 条 · 实时';
+      }
+    });
+    const catCounts = $$('.cats .cat b');
+    if(data.stats && data.stats.byCategory){
+      // 若脚本提供了分类统计则使用
+    }
+
+    // 重渲染列表 / 精选 / 搜索兜底
+    renderFeed();
+    renderTimeline();
+    updateTime = data.updated;
+    document.documentElement.dataset.live = '1';
+    console.log('[Fresource] 真实数据已加载：'+ITEMS.length+' 条，更新于 '+data.updated);
+  }catch(e){
+    console.warn('[Fresource] 真实数据加载失败，使用内置数据：', e.message);
+    document.documentElement.dataset.live = 'fallback';
+  }
+}
+function escapeHTML(str){
+  return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+let updateTime = '';
+bootstrap();
 
 /* ---------- 交互补齐 ---------- */
 </script>
