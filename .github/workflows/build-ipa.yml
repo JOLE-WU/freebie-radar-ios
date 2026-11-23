@@ -1,0 +1,136 @@
+name: Build 资源雷达 IPA
+
+# 在 macOS runner 上编译 iOS App。
+#   • 每次手动运行都产出一个 UNSIGNED IPA，可直接用 AltStore / Sideloadly / 巨魔 / 爱思 等侧载（用你自己的 Apple ID 签名）。
+#   • 若配置了 Apple 签名 secrets，则同时产出签名版 IPA。
+#   • 原生壳是 Capacitor WebView，内容在 capacitor.config.json 的远程 URL；更新内容无需重新出包。
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 1.0.0）'
+        required: false
+        default: '1.0.0'
+        type: string
+      build_number:
+        description: '构建号（整数，留空自动用运行编号）'
+        required: false
+        default: ''
+        type: string
+
+concurrency:
+  group: build-radar-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-ipa:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      RADAR_BUNDLE_ID: ${{ vars.RADAR_BUNDLE_ID || 'com.jolewu.radar' }}
+      DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID || '' }}
+      EXPORT_METHOD: ${{ vars.EXPORT_METHOD || 'development' }}
+      RADAR_VERSION: ${{ inputs.version || '1.0.0' }}
+      RADAR_BUILD: ${{ inputs.build_number || github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 校验版本信息
+        run: |
+          if ! printf '%s' "$RADAR_VERSION" | grep -Eq '^[0-9]+(\.[0-9]+){0,2}$'; then
+            echo "::error::版本号格式不合法：$RADAR_VERSION"; exit 1; fi
+          if ! printf '%s' "$RADAR_BUILD" | grep -Eq '^[0-9]+$'; then
+            echo "::error::构建号必须是整数：$RADAR_BUILD"; exit 1; fi
+          echo "### 📦 资源雷达 v${RADAR_VERSION} (build ${RADAR_BUILD})" >> "$GITHUB_STEP_SUMMARY"
+          echo "commit: \`$GITHUB_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 安装 JS 依赖
+        run: npm install --no-audit --no-fund
+
+      - name: 生成 Capacitor iOS 工程并覆盖配置
+        run: |
+          npx cap add ios
+          npx cap sync ios
+          node scripts/prepare-ios.mjs
+
+      - name: 安装 CocoaPods 依赖
+        run: |
+          cd ios/App
+          pod install --repo-update || pod install
+
+      # ---------- 无签名 IPA（始终产出，供侧载）----------
+      - name: Archive（无签名）
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/radar.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            clean archive
+
+      - name: 打包无签名 IPA
+        run: |
+          IPA="Radar-v${RADAR_VERSION}-b${RADAR_BUILD}-unsigned.ipa"
+          mkdir -p build/Payload
+          cp -R "build/radar.xcarchive/Products/Applications/App.app" build/Payload/Radar.app
+          cd build && zip -qry "../$IPA" Payload
+          cd .. && rm -rf build/Payload
+          printf '资源雷达 v%s (build %s)\nbundle: %s\ncommit: %s\nbuilt: %s\n' \
+            "$RADAR_VERSION" "$RADAR_BUILD" "$RADAR_BUNDLE_ID" "$GITHUB_SHA" \
+            "$(date -u +%FT%TZ)" > radar-version.txt
+          echo "打包完成：$IPA"; cat radar-version.txt
+
+      # ---------- 签名 IPA（仅当配置了 secrets）----------
+      - name: 导入签名证书与描述文件
+        if: env.DEVELOPMENT_TEAM != ''
+        run: |
+          echo "${{ secrets.APPLE_CERTIFICATE_P12 }}" | base64 --decode > build/cert.p12
+          echo "${{ secrets.APPLE_PROVISIONING_PROFILE }}" | base64 --decode > build/profile.mobileprovision
+          KEYCHAIN=build/radar.keychain-db
+          KEYPASS="$(openssl rand -base64 24)"
+          security create-keychain -p "$KEYPASS" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYPASS" "$KEYCHAIN"
+          security import build/cert.p12 -k "$KEYCHAIN" -P "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" -A -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYPASS" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp build/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Archive + 导出签名 IPA
+        if: env.DEVELOPMENT_TEAM != ''
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/radar-signed.xcarchive" \
+            clean archive
+          xcodebuild -exportArchive \
+            -archivePath "$PWD/build/radar-signed.xcarchive" \
+            -exportPath "$PWD/build/export" \
+            -exportOptionsPlist build/ExportOptions.plist
+          cp build/export/App.ipa "Radar-v${RADAR_VERSION}-b${RADAR_BUILD}-signed.ipa"
+
+      # ---------- 产物 ----------
+      - name: 上传 IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Radar-IPA-v${{ env.RADAR_VERSION }}-b${{ env.RADAR_BUILD }}
+          path: |
+            Radar-v*.ipa
+            radar-version.txt
+          if-no-files-found: error

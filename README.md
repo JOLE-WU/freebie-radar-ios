@@ -18,11 +18,17 @@ capacitor.config.json  指向远端 Pages 地址，套壳核心配置
 
 仓库已开启 GitHub Pages，访问：
 
-**https://jole-wu.github.io/freebie-radar-ios/**
+**https://jole-wu.github.io/freebie-radar-ios/**（需在仓库 Settings → Pages → Source 选 "Deploy from a branch" → main /docs，一次即可）
 
 iPhone Safari 打开 → 分享 → **添加到主屏幕**，即可全屏运行、有独立图标、可离线打开。
 
-## 原生安装包（需要 macOS + Xcode）
+## 出 IPA（GitHub Actions 云端编译，无需 Mac）
+
+推送后到 Actions → "Build 资源雷达 IPA" → Run workflow，macOS runner 会自动编译并产出 \`Radar-v*-unsigned.ipa\` 作为 artifact 下载，可直接用 AltStore / Sideloadly / 巨魔 等侧载。
+
+如需签名版，在仓库 Settings → Secrets 配置 \`APPLE_TEAM_ID\` / \`APPLE_CERTIFICATE_P12\` / \`APPLE_CERTIFICATE_PASSWORD\` / \`APPLE_PROVISIONING_PROFILE\`。
+
+## 原生安装包（本地 macOS + Xcode，可选）
 
 1. 在 Mac 上克隆仓库。
 2. 用 Xcode 打开 `ios/App/App.xcworkspace`。
