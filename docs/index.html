@@ -149,6 +149,20 @@
   }
   .scroll::-webkit-scrollbar{ display:none; }
 
+  /* ---------- 下拉刷新 ---------- */
+  .pullrefresh{
+    position:absolute; left:0; right:0; top:0; z-index:5;
+    height:56px; margin-top:-56px;
+    display:flex; align-items:center; justify-content:center; gap:9px;
+    color:var(--text-3); font-size:11.5px; pointer-events:none;
+  }
+  .pullrefresh .pr-spin{
+    width:19px; height:19px; border:2px solid var(--stroke-hi); border-top-color:var(--accent);
+    border-radius:50%; transition: transform .2s;
+  }
+  .pullrefresh.loading .pr-spin{ animation: spin .8s linear infinite; }
+  .pullrefresh.ready .pr-spin{ transform: rotate(180deg); border-top-color:var(--accent); }
+
   /* ---------- 顶部栏 ---------- */
   .topbar{
     position:sticky; top:0; z-index:30;
@@ -392,6 +406,27 @@
     font-size:11.5px; color: var(--text-2); background: var(--card); border:.5px solid var(--stroke);
   }
   .cat b{ font-size:10px; color: var(--text-3); font-weight:600; font-variant-numeric: tabular-nums; }
+
+  /* ---------- 首页垂直分类（彩色卡片网格） ---------- */
+  .vcat{ display:grid; grid-template-columns: repeat(2,1fr); gap:9px; padding: 0 var(--pad); }
+  .vcat-item{
+    position:relative; overflow:hidden; cursor:pointer;
+    display:flex; align-items:center; gap:10px;
+    padding:12px; border-radius:16px; min-height:60px;
+    background: var(--card); border:.5px solid var(--stroke);
+    transition: transform .2s var(--ease), background .2s;
+  }
+  .vcat-item:active{ transform:scale(.965); background:var(--card-hi); }
+  .vcat-ico{
+    width:38px; height:38px; flex:0 0 38px; border-radius:11px;
+    display:grid; place-items:center; color:#fff;
+  }
+  .vcat-ico svg{ width:19px; height:19px; }
+  .vcat-txt{ min-width:0; flex:1; }
+  .vcat-txt .n{ font-size:12.5px; font-weight:650; letter-spacing:-.1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vcat-txt .c{ font-size:10px; color:var(--text-3); margin-top:2px; font-variant-numeric:tabular-nums; }
+  .vcat-item .arrow{ color:var(--text-3); flex:0 0 auto; opacity:.6; }
+  .vcat-glow{ position:absolute; right:-16px; bottom:-20px; width:70px; height:70px; border-radius:50%; filter:blur(18px); opacity:.22; pointer-events:none; }
 
   /* ---------- 精选页 ---------- */
   .digest-hero{
@@ -696,6 +731,7 @@
         <!-- ================= 雷达 / 首页 ================= -->
         <section class="page active" id="page-radar">
           <div class="scroll" data-scroll>
+            <div class="pullrefresh" id="pullRefresh"><span class="pr-spin"></span><span id="prText">下拉刷新</span></div>
             <div class="topbar">
               <div class="brand">
                 <div class="brand-mark">
@@ -740,6 +776,14 @@
             </div>
 
             <div class="sec-head">
+              <div class="sec-title">垂直分类 <small>按兴趣直达</small></div>
+              <div class="sec-more" id="vcatMore">全部频道
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+              </div>
+            </div>
+            <div class="vcat" id="vcatGrid"></div>
+
+            <div class="sec-head">
               <div class="sec-title">本周精选 <small>AI 已验真</small></div>
               <div class="sec-more">全部
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
@@ -768,9 +812,9 @@
             </article>
 
             <div class="sec-head">
-              <div class="sec-title">雷达流 <small id="feedCount">共 10 条</small></div>
-              <div class="sec-more">最新
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+              <div class="sec-title"><span id="feedTitle">雷达流</span> <small id="feedCount">共 10 条</small></div>
+              <div class="sec-more" id="feedReset" style="display:none">重置
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 12a8 8 0 108-8M4 4v5h5"/></svg>
               </div>
             </div>
             <div class="list" id="feed"></div>
@@ -1081,19 +1125,21 @@ let ITEMS = [
   }
 ];
 
+// 每个频道用真实的筛选规则：kw=分类/标题关键词，obtain=获取方式，code=仅兑换码，top=仅高分
 const CHANNELS = [
-  { n:'真福利精选', c:'2,318', i:'spark', f:'free' },
-  { n:'全部白嫖', c:'5,902', i:'free', f:'all' },
-  { n:'实物福利', c:'486', i:'box', f:'all' },
-  { n:'网盘 / 网课', c:'1,204', i:'cloud', f:'all' },
-  { n:'黑五 / 好价', c:'3,771', i:'tag', f:'paid' },
-  { n:'开源项目', c:'640', i:'code', f:'all' },
-  { n:'重要新闻', c:'1,860', i:'news', f:'all' },
-  { n:'行业资讯', c:'3,320', i:'chart', f:'all' }
+  { n:'真福利精选', c:'2,318', i:'spark',  rule:{ top:1 } },
+  { n:'全部白嫖',   c:'5,902', i:'free',   rule:{ obtain:'free' } },
+  { n:'AI 额度',    c:'486',   i:'ai',     rule:{ kw:['AI','额度','积分','token','Token','大模型','ChatGPT','Claude'] } },
+  { n:'游戏喜加一', c:'1,204', i:'box',    rule:{ kw:['游戏','喜加一','Steam','Epic','steam','epic'] } },
+  { n:'主机名额',   c:'3,771', i:'cloud',  rule:{ kw:['VPS','主机','云服务','域名','建站','服务器','云'] } },
+  { n:'兑换码 CDK', c:'640',   i:'code',   rule:{ code:1 } },
+  { n:'软件授权',   c:'1,860', i:'tag',    rule:{ kw:['软件','授权','会员','影音','设计','工具'] } },
+  { n:'其他好价',   c:'3,320', i:'chart',  rule:{ kw:['实物','网盘','网课','数码','硬件','邀请码','security','科技','综合'] } }
 ];
 
 const ICONS = {
   spark:'<path d="M12 3l1.9 5.2L19 10l-5.1 1.8L12 17l-1.9-5.2L5 10l5.1-1.8L12 3z"/>',
+  ai:'<path d="M12 3l1.9 5.2L19 10l-5.1 1.8L12 17l-1.9-5.2L5 10l5.1-1.8L12 3z"/><circle cx="12" cy="10" r="1.4"/>',
   free:'<circle cx="12" cy="12" r="8.4"/><path d="M8.4 12.2l2.6 2.6 4.8-5.4"/>',
   box:'<path d="M4 8l8-4 8 4v8l-8 4-8-4V8z"/><path d="M4 8l8 4 8-4M12 12v8"/>',
   cloud:'<path d="M7.4 18.4A3.9 3.9 0 016.8 10.7a5.2 5.2 0 0110 .9 3.4 3.4 0 01-.6 6.8H7.4z"/>',
@@ -1131,9 +1177,24 @@ function rowHTML(it, i=0, delay=0){
       </div>
     </div>`;
 }
+// 统一匹配：rule 支持 kw（分类/标题关键词）、obtain、code、top
+function matchRule(it, rule){
+  if(!rule) return true;
+  if(rule.obtain && it.obtain !== rule.obtain) return false;
+  if(rule.code && !it.code) return false;
+  if(rule.top && it.score < 80) return false;
+  if(rule.kw && rule.kw.length){
+    const hay = (it.cat+' '+it.t+' '+it.src).toLowerCase();
+    if(!rule.kw.some(k=>hay.includes(String(k).toLowerCase()))) return false;
+  }
+  if(rule.cat && it.cat !== rule.cat) return false;
+  return true;
+}
+let activeRule = null; // 当前频道/分类的筛选规则
 function renderFeed(filter='all', q=''){
   const box = $('#feed');
   const list = ITEMS.filter(it=>{
+    if(activeRule) return matchRule(it, activeRule);
     if (filter === 'code') return !!it.code;
     if (filter !== 'all') return it.obtain === filter;
     return true;
@@ -1193,12 +1254,14 @@ $('#searchBody').addEventListener('click', e=>{
 $('#catChips').addEventListener('click', e=>{
   const b = e.target.closest('.chip'); if(!b) return;
   $$('#catChips .chip').forEach(c=>c.classList.toggle('on', c===b));
+  activeRule = null;
   renderFeed(b.dataset.cat);
+  setFeedTitle(b.dataset.cat === 'all' ? '雷达流' : b.textContent.trim().replace(/\d+/g,'').trim());
 });
 
 /* ---------- 频道 ---------- */
 $('#chanGrid').innerHTML = CHANNELS.map((c,i)=>`
-  <div class="chan" data-chan="${c.n}" data-filter="${c.f||'all'}" style="opacity:0; transform:translateY(10px); animation:rise .5s var(--ease) ${0.04*i}s forwards">
+  <div class="chan" data-chan="${c.n}" data-rule="${i}" style="opacity:0; transform:translateY(10px); animation:rise .5s var(--ease) ${0.04*i}s forwards">
     <div class="deco"></div>
     <div class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">${ICONS[c.i]}</svg></div>
     <div>
@@ -1206,6 +1269,31 @@ $('#chanGrid').innerHTML = CHANNELS.map((c,i)=>`
       <div class="ct">${c.c} 条 · 24h 更新</div>
     </div>
   </div>`).join('');
+
+/* ---------- 首页垂直分类卡片 ---------- */
+const VCATS = [
+  { cat:'AI 额度',     name:'AI 额度',   color:'#7C5CFC', ico:'<path d="M12 3l1.9 5.2L19 10l-5.1 1.8L12 17l-1.9-5.2L5 10l5.1-1.8L12 3z"/>' },
+  { cat:'游戏',        name:'游戏喜加一', color:'#FF6B81', ico:'<path d="M7 8h10l1.5 3.2L16 16H8l-2.5-4.8L7 8z"/><circle cx="9.5" cy="12" r="1"/><path d="M14 11v2M13 12h2"/>' },
+  { cat:'VPS/主机',    name:'VPS 主机',  color:'#3B82F6', ico:'<rect x="4" y="5" width="16" height="6" rx="2"/><rect x="4" y="13" width="16" height="6" rx="2"/><path d="M7 8h.01M7 16h.01M11 8h5M11 16h5"/>' },
+  { cat:'软件授权',    name:'软件授权',  color:'#06B6D4', ico:'<path d="M12 3l8 4v5c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V7l8-4z"/>' },
+  { cat:'影音会员',    name:'影音会员',  color:'#F59E0B', ico:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9l5 3-5 3V9z"/>' },
+  { cat:'云服务',      name:'云服务',    color:'#10B981', ico:'<path d="M7.4 18.4A3.9 3.9 0 016.8 10.7a5.2 5.2 0 0110 .9 3.4 3.4 0 01-.6 6.8H7.4z"/>' },
+  { cat:'开源软件',    name:'开源项目',  color:'#8B5CF6', ico:'<path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/>' },
+  { cat:'实物福利',    name:'实物 / 数码', color:'#EC4899', ico:'<path d="M4 8l8-4 8 4v8l-8 4-8-4V8z"/><path d="M4 8l8 4 8-4M12 12v8"/>' }
+];
+function renderVCats(){
+  const grid = $('#vcatGrid'); if(!grid) return;
+  grid.innerHTML = VCATS.map(c=>{
+    const n = ITEMS.filter(x=>x.cat===c.cat).length;
+    return `<div class="vcat-item" data-cat-item="${c.cat}" data-cat-name="${c.name}" style="opacity:0; transform:translateY(8px); animation:rise .5s var(--ease) ${0.03*VCATS.indexOf(c)}s forwards">
+      <span class="vcat-glow" style="background:${c.color}"></span>
+      <span class="vcat-ico" style="background:linear-gradient(145deg,${c.color},${c.color}cc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${c.ico}</svg></span>
+      <span class="vcat-txt"><span class="n">${c.name}</span><span class="c">${n} 条可领</span></span>
+      <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+    </div>`;
+  }).join('');
+}
+renderVCats();
 
 /* ---------- 精选时间线 ---------- */
 let PICKS = [
@@ -1323,24 +1411,51 @@ $('#rdReload').addEventListener('click', ()=>{
   rdLoadTimer = setTimeout(()=>rdLoading.classList.add('hide'), 8000);
 });
 
+/* ---------- 列表筛选辅助 ---------- */
+function clearChipActive(){ $$('#catChips .chip').forEach(c=>c.classList.remove('on')); }
+function goRadar(){
+  $$('.tab').forEach(t=>t.classList.toggle('on', t.dataset.tab==='page-radar'));
+  $$('.page').forEach(pg=>pg.classList.toggle('active', pg.id==='page-radar'));
+  const sc = $('#page-radar [data-scroll]'); if(sc) sc.scrollTop = 0;
+}
+function setFeedTitle(name){
+  const el = $('#feedTitle'); if(el) el.textContent = name;
+  const sm = $('#feedCount'); if(sm) sm.textContent = '共 '+($('#feed').children.length)+' 条';
+  const rst = $('#feedReset'); if(rst) rst.style.display = (name==='雷达流') ? 'none' : 'flex';
+}
+
 document.addEventListener('click', e=>{
+  if(e.target.closest('#feedReset')){
+    activeRule = null;
+    $$('#catChips .chip').forEach(c=>c.classList.toggle('on', c.dataset.cat==='all'));
+    renderFeed('all'); setFeedTitle('雷达流'); toast('已重置筛选'); return;
+  }
+  if(e.target.closest('#vcatMore')){
+    $$('.tab').forEach(t=>t.classList.toggle('on', t.dataset.tab==='page-chan'));
+    $$('.page').forEach(pg=>pg.classList.toggle('active', pg.id==='page-chan'));
+    return;
+  }
   const o = e.target.closest('[data-open]'); if(o){ openItem(o.dataset.open); }
   const chan = e.target.closest('[data-chan]');
   if(chan){
-    const name = chan.dataset.chan, f = chan.dataset.filter || 'all';
-    $$('.tab').forEach(t=>t.classList.toggle('on', t.dataset.tab==='page-radar'));
-    $$('.page').forEach(pg=>pg.classList.toggle('active', pg.id==='page-radar'));
-    $$('#catChips .chip').forEach(c=>c.classList.toggle('on', c.dataset.cat===f));
-    renderFeed(f);
+    const name = chan.dataset.chan, idx = +chan.dataset.rule;
+    activeRule = CHANNELS[idx] ? CHANNELS[idx].rule : null;
+    clearChipActive();
+    goRadar();
+    renderFeed();
+    setFeedTitle(name);
     toast('已进入「'+name+'」频道');
   }
-  const catEl = e.target.closest('.cats .cat');
+  const catEl = e.target.closest('[data-cat-item]');
   if(catEl){
-    const kw = (catEl.firstChild ? catEl.firstChild.textContent : '').trim();
-    $$('.tab').forEach(t=>t.classList.toggle('on', t.dataset.tab==='page-radar'));
-    $$('.page').forEach(pg=>pg.classList.toggle('active', pg.id==='page-radar'));
-    renderFeed('all', kw);
-    toast('已按「'+kw+'」筛选');
+    const cat = catEl.dataset.catItem;
+    const name = catEl.dataset.catName || cat;
+    activeRule = { cat };
+    clearChipActive();
+    goRadar();
+    renderFeed();
+    setFeedTitle(name);
+    toast('已按「'+name+'」筛选');
   }
   const c = e.target.closest('[data-copy]');
   if(c){ copyText(c.dataset.copy); }
@@ -1429,7 +1544,8 @@ function toggleTheme(){
 
 
 /* ---------- 真实数据加载 ---------- */
-async function bootstrap(){
+let lastRefreshLabel = '';
+async function bootstrap(silent=false){
   try{
     const res = await fetch('./data.json', { cache:'no-store' });
     if(!res.ok) throw new Error('data.json '+res.status);
@@ -1491,12 +1607,15 @@ async function bootstrap(){
       // 若脚本提供了分类统计则使用
     }
 
-    // 重渲染列表 / 精选 / 搜索兜底
+    // 重渲染列表 / 精选 / 分类卡片 / 搜索兜底
+    renderVCats();
     renderFeed();
     renderTimeline();
     updateTime = data.updated;
     document.documentElement.dataset.live = '1';
+    lastRefreshLabel = '更新于 '+new Date(data.updated).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
     console.log('[Fresource] 真实数据已加载：'+ITEMS.length+' 条，更新于 '+data.updated);
+    if(!silent) toast('已刷新 · '+lastRefreshLabel);
   }catch(e){
     console.warn('[Fresource] 真实数据加载失败，使用内置数据：', e.message);
     document.documentElement.dataset.live = 'fallback';
@@ -1506,7 +1625,49 @@ function escapeHTML(str){
   return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 let updateTime = '';
-bootstrap();
+bootstrap(true);
+
+/* ---------- 下拉刷新（首页） ---------- */
+(function(){
+  const sc = $('#page-radar [data-scroll]');
+  const pr = $('#pullRefresh'), prText = $('#prText'), topbar = $('#page-radar .topbar');
+  if(!sc || !pr) return;
+  const THRESHOLD = 62;
+  let startY = 0, pulling = false, dist = 0, refreshing = false;
+  function setDist(d){
+    dist = d;
+    pr.style.transform = `translateY(${d}px)`;
+    pr.style.opacity = Math.min(1, d/THRESHOLD);
+    if(topbar) topbar.style.transform = `translateY(${Math.min(d,THRESHOLD)*0.35}px)`;
+    if(d >= THRESHOLD){ pr.classList.add('ready'); pr.classList.remove('loading'); prText.textContent = '松开刷新'; }
+    else { pr.classList.remove('ready','loading'); prText.textContent = '下拉刷新'; }
+  }
+  sc.addEventListener('touchstart', e=>{
+    if(refreshing || sc.scrollTop > 0) return;
+    startY = e.touches[0].clientY; pulling = true;
+  }, {passive:true});
+  sc.addEventListener('touchmove', e=>{
+    if(!pulling || refreshing) return;
+    const raw = e.touches[0].clientY - startY;
+    if(raw <= 0){ if(dist>0) setDist(0); return; }
+    // 阻尼：越拉越沉
+    const d = Math.min(96, raw * 0.5);
+    setDist(d);
+    if(raw > 6 && e.cancelable) e.preventDefault();
+  }, {passive:false});
+  sc.addEventListener('touchend', async ()=>{
+    if(!pulling) return; pulling = false;
+    if(dist >= THRESHOLD){
+      refreshing = true;
+      pr.classList.remove('ready'); pr.classList.add('loading');
+      prText.textContent = '正在刷新…';
+      setDist(52);
+      await bootstrap(true);
+      prText.textContent = '刷新完成 · ' + (lastRefreshLabel||'刚刚');
+      setTimeout(()=>{ setDist(0); refreshing=false; }, 650);
+    } else { setDist(0); }
+  });
+})();
 
 /* ---------- 交互补齐 ---------- */
 </script>
